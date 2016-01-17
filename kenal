@@ -1,0 +1,59 @@
+# =======================================================================================================
+# 1.Hazard Model with log(time)
+# Estimation sample: 2000Q1~ 2012Q4;   
+# Estimation Outsample forecast evalautaion: 2008Q1~2012Q4
+
+# Auto.arima forecast: 
+#    1). Company variables: past two years 
+#    2). Macro variables: (1)None v.s. 
+#                         (2)Auto.arima forecast of past two years (period=8)  
+
+# 2. Two step : First step is created dataspace for variable then use Linear interpolation and Auto.arima(8 periods)
+#               to create missing value and forecast.  
+ install.packages("INLA", repos="http://www.math.ntnu.no/inla/R/stable")
+ 
+rm(list=ls());
+library(survival)
+library(ROCR)
+library(forecast)
+library(moments)
+library(INLA)
+library(Cairo)
+#inla.upgrade(testing=TRUE)
+# =================================================================================
+# ================================== Step 1 =======================================
+# ================================   Setup    =====================================
+deventcode=1 # 1: ues news default event   ; 0: use last data be default time
+
+# =================================== Input informatin ======================================================
+vars=c(1:24)
+# Code map for def and nondef firm data 
+# -------------------------------------------------------------------------------------------------------------------------------------------
+#      [1]    [2]       [3]     [4]        [5]   [6]    [7]    [8]    [9]      [10]
+# [1]  "firm" "yyyymm"  "code"  "datatime" "TA"  "TLTA" "TLTE" "CLTL" "OCF2TA" "CLTA" 
+# [11] "LR"   "LiquidR" "RE2TA" "ROA"      "EPS" "OCR"  "RT"   "DAT"  "IT"     "TA.1" 
+# [21] "CL"   "TL" "CA" "TE"    "OCF"      "NS"  "OC"   "GP"   "inv"  "lend"      
+#  
+# =================================================================================================================================
+yyyymm=201303 ; # The End time of dataspace
+newsyear=c(2008:2012) # The years of News data
+nondef=read.table('F:/0_Study/6_Theses/code/main_code/firmdata/20131220/nondef20131220.txt',header=TRUE)
+def=read.table('F:/0_Study/6_Theses/code/main_code/firmdata/20131220/def20131220.txt',header=TRUE) 
+Devent=read.table('F:/0_Study/6_Theses/code/Cdata/defaultevent.txt',header=TRUE) #違約公司時間點(TCRI違約新聞事件)
+Devent$code=1
+marc_mark=read.table('F:/0_Study/6_Theses/code/Cdata/marc_mark.txt',header=TRUE) 
+moneyS=read.table('F:/0_Study/6_Theses/code/Cdata/money.txt',header=TRUE)
+
+# Number of default firm at TCRI rating
+yyyyNdef0=read.table('F:/0_Study/6_Theses/code/main_code/firmdata/20131220/yyyyNdef.txt',header=TRUE)
+TCRI=read.table('F:/0_Study/6_Theses/code/main_code/TCRI.txt',header=TRUE) 
+TEJ10=read.table('F:/0_Study/6_Theses/code/Cdata/TEJ10.txt',header=TRUE) # 產業分類碼(未違約) 
+TEJ11=read.table('F:/0_Study/6_Theses/code/Cdata/TEJ11.txt',header=TRUE) # 產業分類碼(違約)
+TimeMapping=read.table("F:/0_Study/6_Theses/code/Cdata/TimeMapping.txt",header=TRUE) ;# TimeMapping.txt
+
+firm1_keyword=read.table("F:/0_Study/6_Theses/code/main_code/firm_code1.txt");
+firm2_keyword=read.table("F:/0_Study/6_Theses/code/main_code/firm_code2.txt");
+firm2_keyword=c(as.matrix(firm2_keyword))
+keywordpath=sprintf("F:/0_Study/6_Theses/code/main_code/GBN/GBNkeyword36_%s.txt",newsyear)
+period=8  # forcasting period
+# ==========================================================================
